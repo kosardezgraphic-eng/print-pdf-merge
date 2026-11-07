@@ -883,6 +883,11 @@ export const UnifiedStudioWorkspace: React.FC<UnifiedStudioWorkspaceProps> = ({
   const isContentCentered =
     viewScrollMode === 'continuous' && sheetsToRender.length <= 1;
 
+  // Single-page view or a single sheet that fits the viewport: center vertically in the available
+  // height so the page is fully visible and not stuck under the top toolbar/menu.
+  const shouldCenterContentVertically =
+    viewScrollMode === 'single' || isContentCentered;
+
   // Auto-center current page/sheet when changing page or scrolling in single mode
   useEffect(() => {
     if (viewScrollMode === 'single') {
@@ -1566,7 +1571,9 @@ export const UnifiedStudioWorkspace: React.FC<UnifiedStudioWorkspaceProps> = ({
                 transformOrigin: 'top center',
                 transition: isPanning ? 'none' : 'transform 0.08s ease-out',
               }}
-              className="relative inline-flex flex-col items-center gap-10 select-none pb-16"
+              className={`relative inline-flex flex-col items-center gap-10 select-none pb-16 ${
+                shouldCenterContentVertically ? 'my-auto' : ''
+              }`}
             >
               {sheetsToRender.map((sIdx) => {
                 const sPages = getSheetPages(sIdx);
