@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#grad1)"/>
+  <path d="M72 56h76l44 44v100c0 8.837-7.163 16-16 16H72c-8.837 0-16-7.163-16-16V72c0-8.837 7.163-16 16-16z" fill="#ffffff" fill-opacity="0.15"/>
+  <path d="M80 64h68l36 36v92c0 6.627-5.373 12-12 12H80c-6.627 0-12-5.373-12-12V76c0-6.627 5.373-12 12-12z" fill="#ffffff"/>
+  <path d="M148 64v36h36" fill="none" stroke="#2563eb" stroke-width="8" stroke-linejoin="round"/>
+  <text x="128" y="160" font-family="Arial, sans-serif" font-size="34" font-weight="900" fill="#dc2626" text-anchor="middle">PDF</text>
+  <path d="M96 185h64" stroke="#2563eb" stroke-width="6" stroke-linecap="round"/>
+</svg>
