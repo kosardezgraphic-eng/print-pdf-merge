@@ -878,6 +878,11 @@ export const UnifiedStudioWorkspace: React.FC<UnifiedStudioWorkspaceProps> = ({
     return Array.from({ length: totalSheets }, (_, i) => i);
   }, [totalSheets, viewScrollMode, currentSheetIndex]);
 
+  // Vertically center content when it fits the viewport (single sheet / few sheets) so the page is
+  // not cramped under the top toolbar. Keep justify-start for multi-sheet continuous scrolling.
+  const isContentCentered =
+    viewScrollMode === 'continuous' && sheetsToRender.length <= 1;
+
   // Auto-center current page/sheet when changing page or scrolling in single mode
   useEffect(() => {
     if (viewScrollMode === 'single') {
@@ -1500,7 +1505,11 @@ export const UnifiedStudioWorkspace: React.FC<UnifiedStudioWorkspaceProps> = ({
           }
         }}
         className={`flex-1 flex flex-col overflow-y-auto overflow-x-auto relative items-center ${
-          viewScrollMode === 'single' ? 'justify-center min-h-full py-6' : 'justify-start py-12'
+          viewScrollMode === 'single'
+            ? 'justify-center min-h-full py-6'
+            : isContentCentered
+              ? 'justify-center min-h-full py-12'
+              : 'justify-start py-12'
         } px-12 bg-neutral-950/20 dark:bg-black/40 gap-10 scroll-smooth ${
           isSpacePressed ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : ''
         }`}
