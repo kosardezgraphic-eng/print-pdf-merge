@@ -1,21 +1,47 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
-const { exec } = require('child_process');
+const { listInstalledPrinters, getNativePrinterCapabilities } = require('./winspool.cjs');
+const {
+  printPdfWithSumatra,
+  openWindowsPrinterPreferences,
+  sweepTempPrintFolder,
+} = require('./printEngine.cjs');
 
 let mainWindow = null;
 
+const ALLOWED_LOCAL_EXTENSIONS = new Set([
+  '.pdf',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.tif',
+  '.tiff',
+  '.bmp',
+]);
+
+const MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  '.bmp': 'image/bmp',
+};
+
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 880,
-    minWidth: 960,
-    minHeight: 640,
-    title: 'سیستم مونتاژ و چاپ PDF و تصاویر (PDF Print Studio)',
-    backgroundColor: '#0f172a',
+    width: 1400,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 680,
+    title: 'استودیو چاپ کوثر | Kosar Print Studio',
+    backgroundColor: '#090d16',
     autoHideMenuBar: true,
-    show: false, // Don't show until ready-to-show to prevent flicker
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -25,7 +51,6 @@ function createWindow() {
     },
   });
 
-  // Open external links in default browser instead of electron window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:')) {
       shell.openExternal(url);
@@ -33,14 +58,10 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  // In production, load the built dist/index.html
-  // In dev, load localhost:3000
   const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
-    // Open DevTools in dev mode
-    // mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
@@ -54,224 +75,103 @@ function createWindow() {
   });
 }
 
-// Handle native Windows printer detection and silent/configured printing
-ipcMain.handle('get-printers', async () => {
+// 1) List printers with real online/offline status
+ipcMain.handle('printer:list', async () => {
   try {
-    let electronPrinters = [];
-    if (mainWindow && mainWindow.webContents && mainWindow.webContents.getPrintersAsync) {
-      try {
-        electronPrinters = (await mainWindow.webContents.getPrintersAsync()) || [];
-      } catch (e) {
-        console.warn('getPrintersAsync error:', e);
-      }
-    }
-
-    if (electronPrinters && electronPrinters.length > 0) {
-      return electronPrinters;
-    }
-
-    // PowerShell fallback on Windows to query Win32_Printer directly
-    if (process.platform === 'win32') {
-      const psPrinters = await new Promise((resolve) => {
-        exec(
-          'powershell -NoProfile -NonInteractive -Command "Get-CimInstance Win32_Printer | Select-Object Name, Default, PrinterStatus, PortName | ConvertTo-Json -Compress"',
-          { timeout: 6000 },
-          (err, stdout) => {
-            if (err || !stdout || !stdout.trim()) {
-              resolve([]);
-              return;
-            }
-            try {
-              const raw = stdout.trim();
-              const parsed = JSON.parse(raw);
-              const list = Array.isArray(parsed) ? parsed : [parsed];
-              resolve(
-                list
-                  .filter((p) => p && p.Name)
-                  .map((p) => ({
-                    name: p.Name,
-                    displayName: p.Name,
-                    isDefault: Boolean(p.Default),
-                    status: p.PrinterStatus || 0,
-                    portName: p.PortName || '',
-                  }))
-              );
-            } catch (e) {
-              console.warn('Failed parsing PowerShell printer JSON:', e);
-              resolve([]);
-            }
-          }
-        );
-      });
-
-      if (psPrinters && psPrinters.length > 0) {
-        return psPrinters;
-      }
-    }
-
-    return electronPrinters || [];
+    return await listInstalledPrinters(mainWindow?.webContents);
   } catch (err) {
-    console.error('Failed to get system printers:', err);
+    console.error('[IPC printer:list] Error:', err);
     return [];
   }
 });
 
-ipcMain.handle('print-to-device', async (event, options) => {
-  if (!mainWindow) throw new Error('No active window');
+// 2) Read real driver capabilities (papers, trays/bins, duplex, color) via winspool.drv
+ipcMain.handle('printer:capabilities', async (_event, payload) => {
+  if (!payload || typeof payload.printerName !== 'string' || !payload.printerName.trim()) {
+    throw new Error('نام چاپگر مشخص نشده است.');
+  }
+  const portName = typeof payload.portName === 'string' ? payload.portName : '';
+  return getNativePrinterCapabilities(payload.printerName.trim(), portName);
+});
 
-  return new Promise(async (resolve, reject) => {
-    let printWin = new BrowserWindow({
-      show: false,
-      width: 1200,
-      height: 1600,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: true,
-      },
-    });
+// 3) Open native Windows Driver Preferences dialog
+ipcMain.handle('printer:open-preferences', async (_event, printerName) => {
+  const printers = await listInstalledPrinters(mainWindow?.webContents);
+  return openWindowsPrinterPreferences(printerName, printers);
+});
 
-    let tempHtmlPath = null;
-
-    const cleanupTempFile = () => {
-      if (tempHtmlPath) {
-        try {
-          if (fs.existsSync(tempHtmlPath)) {
-            fs.unlinkSync(tempHtmlPath);
-          }
-        } catch (e) {
-          console.warn('Temp print file cleanup warning:', e);
-        }
-        tempHtmlPath = null;
-      }
-    };
-
+// 4) Native PDF Print via SumatraPDF CLI with guaranteed temp file cleanup
+ipcMain.handle('printer:print-pdf', async (event, request) => {
+  if (!request || typeof request !== 'object') {
+    return { ok: false, errorCode: 'BAD_REQUEST', errorMessageFa: 'پارامترهای چاپ نامعتبر است.' };
+  }
+  const printers = await listInstalledPrinters(mainWindow?.webContents);
+  return printPdfWithSumatra(app, request, printers, (status) => {
     try {
-      if (options.htmlContent) {
-        // Write to local temporary HTML file to avoid Chromium 2MB data: URL length ceiling
-        tempHtmlPath = path.join(
-          app.getPath('temp'),
-          `print_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.html`
-        );
-        fs.writeFileSync(tempHtmlPath, options.htmlContent, 'utf8');
-        await printWin.loadFile(tempHtmlPath);
-      } else if (options.url) {
-        await printWin.loadURL(options.url);
-      } else {
-        if (printWin) printWin.close();
-        cleanupTempFile();
-        reject(new Error('No content provided for printing'));
-        return;
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('printer:status', status);
       }
-    } catch (err) {
-      if (printWin) printWin.close();
-      cleanupTempFile();
-      reject(err);
-      return;
+    } catch {
+      // Ignore destroyed sender
     }
-
-    printWin.webContents.on('did-finish-load', async () => {
-      // Ensure all images are fully loaded and decoded before rasterizing the print job
-      try {
-        await printWin.webContents.executeJavaScript(`
-          Promise.all(
-            Array.from(document.images).map(img => {
-              if (img.complete && img.naturalWidth > 0) {
-                return 'decode' in img ? img.decode().catch(() => {}) : Promise.resolve();
-              }
-              return new Promise(res => {
-                img.onload = () => {
-                  if ('decode' in img) img.decode().catch(() => {}).then(res);
-                  else res();
-                };
-                img.onerror = res;
-              });
-            })
-          )
-        `);
-      } catch (e) {
-        console.warn('Wait for images in printWin error:', e);
-      }
-
-      // Small paint buffer
-      await new Promise((r) => setTimeout(r, 200));
-
-      if (!printWin) {
-        cleanupTempFile();
-        return;
-      }
-
-      // Map duplexMode correctly: handles duplexLong, duplexShort, and booklet
-      let duplexMode = 'simplex';
-      if (
-        options.duplex === 'duplexLong' ||
-        options.duplex === 'duplex-long' ||
-        options.duplex === 'longEdge'
-      ) {
-        duplexMode = 'longEdge';
-      } else if (
-        options.duplex === 'duplexShort' ||
-        options.duplex === 'duplex-short' ||
-        options.duplex === 'shortEdge' ||
-        options.duplex === 'booklet'
-      ) {
-        duplexMode = options.landscape ? 'shortEdge' : 'longEdge';
-      }
-
-      // Paper size mapping: Electron requires standard name or { width, height } in microns
-      let pageSize = options.paperSize || 'A4';
-      if (options.paperSize === 'B5') {
-        pageSize = { width: 176000, height: 250000 };
-      } else if (typeof options.paperSize === 'object' && options.paperSize.widthMm) {
-        pageSize = { width: options.paperSize.widthMm * 1000, height: options.paperSize.heightMm * 1000 };
-      }
-
-      const printOpts = {
-        silent: options.silent !== false && !!options.deviceName,
-        printBackground: true,
-        deviceName: options.deviceName || '',
-        color: options.colorMode !== 'bw' && options.color !== false,
-        margins: { marginType: 'none' },
-        landscape: options.landscape || false,
-        pagesPerSheet: 1,
-        collate: options.collate !== false,
-        copies: Math.max(1, options.copies || 1),
-        header: '',
-        footer: '',
-        pageSize,
-        duplexMode,
-      };
-
-      printWin.webContents.print(printOpts, (success, errorType) => {
-        if (printWin) {
-          printWin.close();
-          printWin = null;
-        }
-        cleanupTempFile();
-        if (!success) {
-          if (errorType === 'cancelled') {
-            resolve({ success: false, cancelled: true });
-          } else {
-            reject(new Error(errorType || 'Printing failed'));
-          }
-        } else {
-          resolve({ success: true });
-        }
-      });
-    });
-
-    printWin.webContents.on('did-fail-load', (e, code, desc) => {
-      if (printWin) {
-        printWin.close();
-        printWin = null;
-      }
-      cleanupTempFile();
-      reject(new Error(desc || 'Failed to load print document'));
-    });
   });
 });
 
-// Single instance lock to prevent multiple instances
+// 5) Save generated PDF via native OS Save Dialog
+ipcMain.handle('file:save-pdf', async (_event, payload) => {
+  if (!payload || !payload.pdfBytes) {
+    return { ok: false, error: 'داده فایل PDF خالی است.' };
+  }
+  const suggested =
+    typeof payload.suggestedName === 'string' && payload.suggestedName.trim()
+      ? payload.suggestedName.trim()
+      : 'Kosar_Output.pdf';
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'ذخیره فایل PDF خروجی',
+    defaultPath: suggested,
+    filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
+  });
+
+  if (result.canceled || !result.filePath) {
+    return { ok: false, canceled: true };
+  }
+
+  try {
+    const buf = Buffer.from(payload.pdfBytes);
+    await fs.promises.writeFile(result.filePath, buf);
+    return { ok: true, savedPath: result.filePath };
+  } catch (err) {
+    return { ok: false, error: `خطا در نوشتن فایل روی دیسک: ${err.message}` };
+  }
+});
+
+// 6) Read local project file for Auto-Save restoration (strictly restricted to allowed print extensions)
+ipcMain.handle('file:read-local', async (_event, filePath) => {
+  if (typeof filePath !== 'string' || !path.isAbsolute(filePath)) {
+    return { ok: false, error: 'مسیر فایل معتبر نیست.' };
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  if (!ALLOWED_LOCAL_EXTENSIONS.has(ext)) {
+    return { ok: false, error: 'پسوند فایل مجاز نیست.' };
+  }
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile() || stat.size === 0 || stat.size > 600 * 1024 * 1024) {
+      return { ok: false, error: 'فایل در مسیر قبلی یافت نشد یا حجم آن بیش از حد مجاز است.' };
+    }
+    const buf = await fs.promises.readFile(filePath);
+    return {
+      ok: true,
+      name: path.basename(filePath),
+      mimeType: MIME_BY_EXT[ext] || 'application/octet-stream',
+      bytes: new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength),
+    };
+  } catch {
+    return { ok: false, error: 'فایل یافت نشد.' };
+  }
+});
+
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -283,7 +183,8 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    await sweepTempPrintFolder(app);
     createWindow();
 
     app.on('activate', () => {
@@ -291,6 +192,10 @@ if (!gotTheLock) {
     });
   });
 }
+
+app.on('will-quit', () => {
+  void sweepTempPrintFolder(app);
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -1,0 +1,21 @@
+THIRD-PARTY COMPONENT NOTICE — SumatraPDF
+=========================================
+
+When packaged for Windows distribution, Kosar Print Studio invokes SumatraPDF
+("SumatraPDF.exe") as an independent external command-line executable via standard
+OS process execution (Mere Aggregation) to spool generated PDF files to Windows
+printer drivers.
+
+SumatraPDF is Copyright (c) Krzysztof Kowalczyk and contributors, licensed under
+the GNU General Public License version 3 (GPLv3).
+
+- Official Website: https://www.sumatrapdfreader.org/
+- Complete Source Code: https://github.com/sumatrapdfreader/sumatrapdf
+- License Text (GNU GPLv3): https://www.gnu.org/licenses/gpl-3.0.txt
+
+Compliance Checklist for Distributors:
+1. Keep this notice and a copy of the GNU GPLv3 text alongside SumatraPDF.exe in
+   the packaged `resources/bin/` folder.
+2. Do not modify SumatraPDF.exe without publishing the corresponding modified
+   SumatraPDF source code under GPLv3.
+3. Retain attribution and the source code link in the application documentation.

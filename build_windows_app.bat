@@ -1,20 +1,30 @@
 @echo off
 chcp 65001 > nul
 echo ========================================================
-echo   در حال ساخت نرم افزار دسکتاپ ویندوز PDF Print Studio
+echo   در حال ساخت نسخه دسکتاپ ویندوز استودیو چاپ کوثر 2.0
+echo   Kosar Print Studio — NSIS Installer ^& Portable EXE
 echo ========================================================
 echo.
 
-echo [1/2] در حال بررسی وابستگی‌ها و بسته‌ها...
-call npm install --legacy-peer-deps
+if not exist "resources\bin\SumatraPDF.exe" (
+  echo [هشدار] فایل resources\bin\SumatraPDF.exe یافت نشد!
+  echo برای فعال بودن چاپ مستقیم سینی و کاغذ، قبل از بیلد نهایی فایل SumatraPDF.exe را در پوشه resources\bin قرار دهید.
+  echo.
+)
+
+echo [1/3] نصب وابستگی‌ها...
+call npm install
 
 echo.
-echo [2/2] در حال کامپایل و ساخت فایل‌های نصبی و پرتابل EXE با ELECTRON_BUILD...
+echo [2/3] اجرای تست‌های کنترل کیفیت...
+call npm test
+
+echo.
+echo [3/3] ساخت فایل نصبی NSIS و پرتابل در پوشه release...
 call npm run electron:build
 
 echo.
 echo ========================================================
-echo   عملیات با موفقیت انجام شد!
-echo   فایل‌های نصبی و پرتابل در پوشه release قرار گرفتند.
+echo   عملیات به پایان رسید. خروجی‌ها در پوشه release قرار دارند.
 echo ========================================================
 pause

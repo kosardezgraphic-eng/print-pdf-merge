@@ -1,8 +1,0 @@
-{
-  "name": "Remix PDF Counter \u0026 Merger Pro",
-  "description": "Fast offline desktop utility to count total PDF pages, preview, reorder, batch process, and merge PDF documents with custom output destination.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
