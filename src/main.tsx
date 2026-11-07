@@ -1,16 +1,13 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import {createRoot} from 'react-dom/client';
 import '@fontsource/vazirmatn/400.css';
-import '@fontsource/vazirmatn/500.css';
 import '@fontsource/vazirmatn/600.css';
 import '@fontsource/vazirmatn/700.css';
+import '@fontsource/plus-jakarta-sans/400.css';
+import '@fontsource/plus-jakarta-sans/600.css';
+import '@fontsource/plus-jakarta-sans/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/600.css';
+import App from './App.tsx';
 import './index.css';
-import App from './App';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+createRoot(document.getElementById('root')!).render(<App />);

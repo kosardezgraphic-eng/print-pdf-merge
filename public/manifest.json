@@ -1,7 +1,7 @@
 {
-  "short_name": "چاپ کوثر",
-  "name": "استودیو چاپ کوثر — Kosar Print Studio",
-  "description": "سامانه تخصصی چیدمان ماتریسی و چاپ مستقیم PDF و تصاویر ویژه چاپخانه و کپی‌سنتر",
+  "short_name": "PDF Counter",
+  "name": "PDF Counter & Merger Pro - Windows Offline",
+  "description": "Fast offline desktop utility to count total PDF pages, preview, reorder, batch process, and merge PDF documents with custom output destination.",
   "icons": [
     {
       "src": "/icon.svg",
@@ -10,8 +10,8 @@
     }
   ],
   "start_url": "/",
-  "background_color": "#0f172a",
-  "theme_color": "#2563eb",
+  "background_color": "#0a0a0a",
+  "theme_color": "#1d4ed8",
   "display": "standalone",
   "orientation": "any"
 }

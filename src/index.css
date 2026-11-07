@@ -2,20 +2,20 @@
 
 @layer base {
   :root {
-    --font-vazir: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', Consolas, monospace;
+    --font-vazir: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, Arial, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
   }
 
-  html,
-  body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
+  [dir="rtl"] {
     font-family: var(--font-vazir);
   }
 
-  html.light,
-  html:not(.dark) {
+  [dir="ltr"] {
+    font-family: var(--font-sans);
+  }
+
+  html.light, html:not(.dark) {
     color-scheme: light;
   }
 
@@ -24,20 +24,16 @@
   }
 
   html.light body {
-    background-color: #f1f5f9;
+    background-color: #f8fafc;
     color: #0f172a;
   }
 
   html.dark body {
-    background-color: #090d16;
+    background-color: #0a0a0a;
     color: #f8fafc;
   }
 
-  .font-num {
-    font-family: var(--font-mono), var(--font-vazir);
-    font-variant-numeric: tabular-nums;
-  }
-
+  /* Custom smooth scrollbars */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -48,20 +44,42 @@
   }
 
   html.dark ::-webkit-scrollbar-thumb {
-    background: #334155;
-    border-radius: 9999px;
+    background: #333333;
+    border-radius: 4px;
   }
 
   html.dark ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+    background: #4f4f4f;
   }
 
   html.light ::-webkit-scrollbar-thumb {
     background: #cbd5e1;
-    border-radius: 9999px;
+    border-radius: 4px;
   }
 
   html.light ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+/* Print specific styles to guarantee no UI bleed */
+@media print {
+  body > *:not(#pdf-print-iframe) {
+    display: none !important;
   }
 }
