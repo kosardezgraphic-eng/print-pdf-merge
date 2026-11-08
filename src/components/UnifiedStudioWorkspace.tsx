@@ -892,14 +892,16 @@ export const UnifiedStudioWorkspace: React.FC<UnifiedStudioWorkspaceProps> = ({
   useEffect(() => {
     if (viewScrollMode === 'single') {
       setViewportPan({ x: 0, y: 0 });
-      // Center the rendered sheet element in the viewport (same as continuous mode)
+      const container = canvasContainerRef.current;
+      if (container) {
+        container.scrollTop = 0;
+        container.scrollLeft = 0;
+      }
+      // Center the rendered sheet element in the viewport (same as continuous mode).
+      // Must run AFTER scrollTop reset so it centers from the top, not leaves the page at the top.
       const el = document.getElementById(`sheet-${currentSheetIndex}`);
       if (el) {
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
-      }
-      if (canvasContainerRef.current) {
-        canvasContainerRef.current.scrollTop = 0;
-        canvasContainerRef.current.scrollLeft = 0;
       }
     } else if (viewScrollMode === 'continuous' && canvasContainerRef.current) {
       const el = document.getElementById(`sheet-${currentSheetIndex}`);
